@@ -12,5 +12,6 @@ This R script takes the same input files as FRESCALO:
 More information about FRESCALO at http://www.brc.ac.uk/biblio/frescalo-computer-program-analyse-your-biological-records  and https://github.com/BiologicalRecordsCentre/sparta/wiki/frescalo
 
 # Updates Apr. 2024 by Oli Pescott
-Added calculation of standard deviations and fixed some bugs encountered with sparse data.
-Included dataset and weights from (sparta)[https://github.com/biologicalRecordsCentre/sparta] used to check all outputs. Matched against original fortran and this R coding https://github.com/sacrevert/fRescalo (`unicorn_TF.rda`) includes the results from running the original fortran code on the test data (`clusterTestDat.csv`).
+-- Added calculation of standard deviations and fixed some bugs encountered with sparse data.
+-- Included dataset and weights from (sparta)[https://github.com/biologicalRecordsCentre/sparta] used to check all outputs. Matched against original fortran and this R coding https://github.com/sacrevert/fRescalo 
+-- `unicorn_TF.rda` includes the results from running the original fortran code on the test data `clusterTestDat.csv`.
