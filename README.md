@@ -17,4 +17,4 @@ More information about FRESCALO at http://www.brc.ac.uk/biblio/frescalo-computer
 - `unicorn_TF.rda` includes the results from running the original fortran code on the test data `clusterTestDat.csv` with the weights in `GB_LC_Wts.txt`.
 
 ## Tutorial
-Under development, but see https://rpubs.com/sacrevert/parallelFrescalo
+Under development, but see https://rpubs.com/sacrevert/parallelFrescalo (code in this repo [here](https://github.com/sacrevert/frescaloR/blob/master/parallelFrescaloMarkdown.Rmd))
