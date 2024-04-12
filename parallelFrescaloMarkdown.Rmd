@@ -1,0 +1,169 @@
+---
+title: "An introduction to the use of parallelised Frescalo for time-trends in species occurrence
+  data collected with variable effort"
+authors: Drs Oli Pescott and Jon Yearsley
+date: 12th April 2024
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+```{r message=FALSE, warning=FALSE, include=FALSE}
+if (!"foreach" %in% installed.packages()) install.packages('foreach')
+if (!"doParallel" %in% installed.packages()) install.packages('doParallel')
+if (!"here" %in% installed.packages()) install.packages('here')
+require(foreach, quietly=T)
+require(doParallel, quietly=T)
+require(here, quietly=T)
+source(here('scripts/frescalo_functions.R')) # source required functions
+```
+# Introducton
+In this tutorial we briefly demonstrate the use of Dr Jon Yearsley's parallelised R coding of FreScaLO (Frequency Scaling using Local Occupancy). The original paper of Hill (2012) is [here](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00146.x).
+
+# Required data
+The data in the example are dummy data derived from the "unicorns" dataset in the [sparta](https://github.com/biologicalRecordsCentre/sparta) package, filtered and arranged into two time bins. The weights used are those created for Great Britain at the 10 x 10 km grid scale using UKCEH Land Cover Map information, also packaged within sparta. These data have all been pre-prepared for use with frescalo; guidance on these steps can be found within the sparta [vignette](http://biologicalrecordscentre.github.io/sparta/articles/sparta_vignette.html). Custom weights could be created using the `sparta::createWeights()` function, or other approaches (e.g. see [here](https://github.com/sacrevert/frescaloNeighbourhoods) and [here](https://github.com/sacrevert/createIDFneighbourhood)). In this example the sites are 10 x 10 km squares of the British National Grid (ESPG:27700) in lettered format, the species are just represented by arbitrary names and the time bins are of arbitrary length.
+
+```{r message=TRUE, warning=FALSE, include=TRUE}
+s <- read.csv(file = here("data/clusterTestDat.csv"), stringsAsFactors = F, header = T)
+s <- s[,c(4,2,3)]
+head(s)
+d <- read.delim(file = here("data/GB_LC_Wts.txt"), header = F, sep = "")
+d <- d[,c("V1","V2","V3")]
+# location 1 = focal site, location2 = sites in focal site neighbourhood, w = weight of site in neighbourhood
+names(d) <- c("location1", "location2", "w")
+head(d)
+```
+
+We now establish a computing cluster (here just on a local machine, but this can obviously be done on an HPC as well) using the `doParallel` library. We then also set a number of parameters and options for the frescalo algorithm.
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+# Set the size of the cluster (number of nodes). 
+# cores=NULL will automatically pick the number of cores per node 
+# (by defauult this is half the number of available cores)
+cl <- makeCluster(3)
+registerDoParallel(cl, cores = NULL)
+
+R_star = 0.27 # Proportion of species used as benchmarks within neighbourhoods
+trend_analysis = TRUE # Perform trend analysis
+outputPrefix = 'outputs/testApr24_' # relative directory path and prefix for all output files
+Phi = 0.74 # Target value of neighbourhood local-frequency weighted mean frequency using to standardise sampling intensity across neighbourhoods
+chunkSize = 250 # Number of sites or other data segments to pass to each compute node
+```
+
+We now prepare various required objects for the first part of the frescalo algorithm (subrouting "fresca" in the [original fortran code](https://www.brc.ac.uk/biblio/frescalo-computer-program-analyse-your-biological-records]). Broadly speaking, this part of the analysis equalises sampling intensity across all neighbourhoods in the analysis, in order to make them comparable for the subsequent trend assessment. Note that an alternative R translation of the original fortran is also available [here](https://github.com/sacrevert/fRescalo); this loop-based implementation is much slower than the current parallelised version, and was done for educational purposes rather than actual use.
+
+```{r message=TRUE, eval = TRUE, warning=FALSE, include=TRUE}
+spLocations = unique(s$location) # unique list of sites
+d <- d[d$location1 %in% spLocations,] # just keep relevant neighbourhoods in weights file
+speciesNames = as.character(unique(s$species))  # create list of unique species
+
+# For each region record presence/absence of each species
+locationGroups = as.factor(rep(c(1:ceiling(length(spLocations)/chunkSize)),each=chunkSize))
+sSplit = split(s, locationGroups[match(s$location, spLocations)])  # Split species data up into hectads
+idx = iter(sSplit)
+speciesList <- foreach(spList = idx, .inorder=T, .combine='c') %dopar% {
+  speciesListFun(spList = spList, species = speciesNames) # which species are in each location?
+}
+
+# For each focal regional calculate the sampling intensity multipler alpha_i
+dSub = d[,1:3] # not really needed if d already has 3 columns
+location1List = as.character(unique(dSub$location1))    # Create list of unique focal regions
+location1Groups = as.factor(rep(c(1:ceiling(length(location1List)/chunkSize)),each=chunkSize))
+dSplit = split(dSub, location1Groups[match(dSub$location1, location1List)])  # Split neighbourhood data up into focal regions
+# Run frescalo algorithm across chunks of neighbourhood data
+output <- foreach(i=1:length(dSplit), .inorder=T, .combine='cfun', .multicombine=TRUE) %dopar% {
+  frescalo(data_in = dSplit[[i]], speciesList, spLocations, speciesNames, Phi, R_star=0.27, missing.data = 2)
+}
+```
+
+We now have our two output tables. `output$frescalo.out` is the equivalent of the "location report" `samples.txt` from the original fortran program. This provides site- and neighbourhood-level information relating to the rescaling of the frequency-weighted mean frequency (phi_i) across neighbourhoods, and derived quantitites.
+
+The other table `output$freq.out` is the equivalent of the "listing of rescaled species frequencies" table `frequencies.out` produced by the original fortran program. This is a table of sites x species, providing such information as the rescaled local frequencies of species across neighbourhoods, across all time periods. This can be considered as an idealised average local frequency, from which the time period-specific deviations will subsequently be estimated. The rescaled frequencies of species in neighbourhoods are also used to select the benchmark species for each neighbourhood using a single value of `R_star`. Once all neighbourhoods have been scaled to have the same "shape" (i.e. value of phi, the frequency weighted local mean frequency), then, after rank normalisation, the same proportion of each rescaled and normalised frequency curve can be selected from each neighbourhood using `R_star`.
+
+```{r message=TRUE, eval = TRUE, warning=FALSE, include=TRUE}
+head(output$frescalo.out)
+head(output$freq.out)
+
+# And we could write the outputs to text files using our specified path and prefix
+# write.table(format(output$frescalo.out[order(output$frescalo.out$location),], digits=4,zero.print=T, width=10), 
+#             file=paste(outputPrefix,'_frescalo_out.txt',sep=''), col.names=T, row.names=F, quote=F, sep=' ')
+# write.table(format(output$freq.out[order(output$freq.out$location, output$freq.out$rank),], digits=4, zero.print=T, width=10, scientific=F, justify='left'), 
+#             file=paste(outputPrefix,'_frescalo_freq.txt',sep=''), col.names=T, row.names=F, quote=F, sep=' ')
+```
+
+The following animation provides a theoretical example of how this aspect of frescalo is intended to work. This was generated using an underlying multivariate Poisson point process (representing a community or species pool within a neighbourhood), combined with thinning (i.e. less than "perfect" sampling intensity relative to retrieving the true frequencies of species in the neighbourhood) and an iterative approach to then acheiving a target value of the frequency-weighted mean frequency (i.e. phi). The code behind this simulation can be found [here](https://github.com/sacrevert/Frequency-rescaling-demo). The red dot shown for each curve is its phi value (its frequency-weighted mean frequency).
+
+```{r gif-display, fig.cap="Animation demonstrating the idea of rescaling a neighbourhood species frequency curve",out.width='75%', out.height='75%', message=FALSE, eval = TRUE, warning=FALSE, include=TRUE}
+require(knitr, quietly=T)
+include_graphics(here("outputs/species_frequency_animation.gif"))
+```
+
+Finally, we perform the frescalo trend analysis. In the original fortran code, this was subroutine "tfcalc". The `trend.out` object was simply described in the original frescalo README as "listing of time factors for species", although the standard deviations of these are also included.
+
+```{r message=TRUE, eval = TRUE, warning=FALSE, include=TRUE}
+# Trend analysis
+if (trend_analysis) {
+  # Do the Frescalo trend analysis if there are more than 1 year bins (use same location groups as sSplit)
+  sSplit2 = split(s, as.factor(s$time))  # Split species data up into year bins
+  trend.out <- foreach(i=1:length(sSplit2), .inorder=T, .combine='rbind') %dopar% {
+    trend(s_data = sSplit2[[i]], output$freq.out)
+  }
+}
+head(trend.out, n = 25)
+# If we were saving output:
+# if (trend_analysis) {
+#   write.table(format(trend.out[order(trend.out$species,trend.out$time),], digits=4, zero.print=T, width=10, scientific=F, justify='left'), 
+#               file=paste(outputPrefix,'_frescalo_trend.txt',sep=''), col.names=T, row.names=F, quote=F, sep=' ')
+# }
+
+stopCluster(cl) # stop cluster
+```
+
+There are various things that we can do with these outputs. The most obvious being to plot the time trend for any given species, along with its standard deviations.
+
+```{r message=TRUE, eval = TRUE, warning=FALSE, include=TRUE}
+sppToPlot <- trend.out[trend.out$species=="Species 1",]
+plot(1,type='n',
+     ylim = c(0,1.0),
+xlim = c(0.75,2.25), xlab = 'Time', ylab ='Relative frequency', 
+main = paste0(unique(sppToPlot$species)), cex.main = 0.7, cex.lab = 0.7, cex.axis = 0.5)
+abline(h = 0, col = "grey5", lty = 1, lwd = 0.7)
+points(x = sppToPlot$time, y = sppToPlot$tFactor, pch = 21, col = "black", cex = 1, bg = "white")
+arrows(x0 = sppToPlot$time, x1 = sppToPlot$time, y0 = sppToPlot$tFactor - sppToPlot$StDev, 
+       y1 = sppToPlot$tFactor + sppToPlot$StDev, length = 0, col = "black")
+```
+
+We can then fit a model for the linear trend for example, ideally respecting the uncertainty around the point estimates. Bootstrapped line ensembles  (see [here](https://www.sciencedirect.com/science/article/pii/S1470160X22005891) for a Frescalo example) or Bayesian meta-regression are both potential options here, depending on the aim and audience.
+
+```{r message=FALSE, eval = TRUE, warning=FALSE, include=FALSE}
+source(here('scripts/leHelperFunctions.R')) # source required functions
+```
+
+```{r message=TRUE, eval = TRUE, warning=FALSE, include=TRUE}
+# create 100 random draws for each species at each time point and fit linear model
+spLs <- spLsSim <- vector("list", length(unique(sppToPlot$species)))
+names(spLsSim) <- unique(sppToPlot$species)
+spLs <- lapply(unique(sppToPlot$species), function(x) sppToPlot[sppToPlot$species == x,])
+names(spLs) <- unique(sppToPlot$species) # add names to list elements
+out <- lapply(spLs, function(x) fitLinModSp(x)) # fit linear models using helper function
+out2 <- lapply(out, FUN = extractDf)
+
+### Create line ensemble plots from lists of bootstrapped linear model fits
+par(mfrow=c(1,1))
+for (i in seq_along(out2)[1]){ # taken and simplified from existing code across many species
+  plot(1,type='n',
+       ylim = c(0.2,0.85),
+       xlim = c(1,2), xlab = 'Time', ylab ="", 
+       main = "", cex.lab = 1.2, cex.axis = 1.0)
+  title(ylab = "Relative frequency", line = 2.2, cex.lab = 1.2)
+  ## add 100 lines to ensemble plot
+  for (j in 1:100) {
+    abline(a = out2[[i]][j,1], b = out2[[i]][j,2], col = adjustcolor("blue", alpha = 0.05), lwd = 2)
+  }
+  ## add original Frescalo (Hill, 2012) time-period specific means and standard deviations
+  abline(a = 0, b = 0, col = "grey")
+  arrows(x0 = spLs[[i]]$time, x1 = spLs[[i]]$time, y0 = spLs[[i]]$tFactor - spLs[[i]]$StDev,
+         y1 = spLs[[i]]$tFactor + spLs[[i]]$StDev, length = 0, col = "black", lwd = 0.8)
+  points(x = spLs[[i]]$time, y = spLs[[i]]$tFactor, pch = 21, col = "black", cex = 0.8, bg = "white")
+}
+```
