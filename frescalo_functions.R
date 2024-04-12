@@ -140,7 +140,6 @@ frescalo = function(data_in, speciesList, spLocations, speciesNames, Phi=0.74, R
 }
 
 
-#trend = function(s_data, freq.out, calcSD = TRUE) {
 trend = function(s_data, freq.out) {
   # Frescalo trend analysis
   # Function to calculate the time scaling factor for each species in a single year bin
