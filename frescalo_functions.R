@@ -4,8 +4,11 @@
 # This script is sourced in the frescalo_parallel.R script
 #
 # Jon Yearsley (jon.yearsley@ucd.ie) Oct 2016
-#
 # All these scripts have been checked against the original FRESCALO FORTRAN program
+#
+# Minor amendments by Oli Pescott (olipes@ceh.ac.uk) Apr 2024, to produce time factor SDs, and to match Hill outputs for sparse datasets
+# Checks were made against both fortran outputs and independent R coding of fortran approach here: https://github.com/sacrevert/fRescalo
+# Unicorns dataset from sparta used to check all outputs (see https://github.com/biologicalRecordsCentre/sparta) and https://github.com/sacrevert/fRescalo 
 #
 ##########################
 
@@ -15,12 +18,14 @@ min.fun <- function(alpha,fij,Phi) {
   # The function to minimise to fit Frescalo model to the data 
   # Page 5 column 2 in Hill (2011)
   F=1-(1-fij)^alpha
-  F[abs(fij-1)<1e-10] = 1
+  #F[abs(fij-1)<1e-10] = 1 # Yearsley
+  F[abs(fij-1)<1.0E-10] = 0.99999 # to match Hill (2012), although not needed for Yearlsey calc strictly
+  F[abs(fij-1)>0.99999] = 1.0E-10
   return( sum(F^2)/sum(F) - Phi)
 }
 
 speciesListFun = function(spList, species) {
-  # A function that returns the presences and absecences of species per region
+  # A function that returns the presences and absences of species per region
   # spList should be a data frame with columns location, species and time  
 
   # Create list of all locations
@@ -37,6 +42,10 @@ speciesListFun = function(spList, species) {
 }
 
 frescalo = function(data_in, speciesList, spLocations, speciesNames, Phi=0.74, R_star=0.27, missing.data = 2) {
+  ## testing
+  #data_in = dSplit[[1]]; Phi=0.74; R_star=0.27; missing.data = 1
+  #missing.data = 2
+  
   # This function calculates the sampling effort multiplier, alpha, that would equate sampling effort across all regions
   # This is the main method of Frescalo.
   
@@ -67,10 +76,11 @@ frescalo = function(data_in, speciesList, spLocations, speciesNames, Phi=0.74, R
     
     # Identify species in neighbourhood of focal region
     # If data are mssing assign it to the empty species list (last element of speciesList)
-    neighbourhood = match(focal_d$location2, spLocations, nomatch=length(speciesList))
+    neighbourhood = match(focal_d$location2, spLocations, nomatch=length(speciesList)+1) # empty neighbourhood sites are NULL
     speciesRegional = speciesList[neighbourhood]
+    speciesRegional <- lapply(speciesRegional, function(x) if(is.null(x)) rep(0, times = length(speciesNames)) else x) # correct issue with last neighbourhood
     
-    missingData = neighbourhood==length(speciesList)
+    missingData <- neighbourhood==length(speciesList)+1 # length(speciesList) is number of locations; missing data is neighbourhoods with
     if (any(missingData) & missing.data==1) {
       # Species data missing from a location in the neighbourhood. Ignore this focal location
       warning(paste('Removing location ',focal,'. Missing data for locations in the neighbourhood.', sep=''))
@@ -80,11 +90,12 @@ frescalo = function(data_in, speciesList, spLocations, speciesNames, Phi=0.74, R
       out$phi_in[f]= NA 
     } else {
       # Calculate weights of locations in the neighbourhood
-      weights = focal_d$w/sum(focal_d$w)
+      weights = focal_d$w/(sum(focal_d$w)+1.0E-10)
       
       # Create weighted neighbourhood frequencies (checked against Frescalo)
       frequency = Reduce('+',Map('*',as.list(weights), speciesRegional))  
-      
+      # Added by Oli Pescott, Apr 2024, to avoid zeros and match Hill (2012) outputs
+      frequency <- ifelse(frequency==0, frequency+1.0E-10, frequency)
       phi_in = sum(frequency^2) / sum(frequency)
       
       # Calculate the multiplier (alpha) that equalises recording effort 
@@ -123,11 +134,13 @@ frescalo = function(data_in, speciesList, spLocations, speciesNames, Phi=0.74, R
                                             rank_1=R_prime,
                                             benchmark=benchmarkSpecies))
     }
+    #progress::setTxtProgressBar(progress_bar, value = f)
   }
   return(list(frescalo.out=out, freq.out=freq.out))
 }
 
 
+#trend = function(s_data, freq.out, calcSD = TRUE) {
 trend = function(s_data, freq.out) {
   # Frescalo trend analysis
   # Function to calculate the time scaling factor for each species in a single year bin
@@ -151,20 +164,22 @@ trend = function(s_data, freq.out) {
   if (length(timeBin)>1) {
     warning('More than one time bin supplied to trend() function')
   }
-
+  #freq.out <- output$freq.out
+  #s_data = sSplit2[[1]]
   locationList = as.character(unique(freq.out$location))
   spList = unique(s_data$species)
 
   # Calculate the proportion of benchmark species in each hectad (for this time bin)
   focal_s = split(s_data, factor(s_data$location, levels=locationList))
   focal_bench = split(freq.out, factor(freq.out$location, levels=locationList))
-  s_it = mapply(FUN=function(x,y) {sum(x$benchmark[x$species%in%y$species])/sum(x$benchmark)}, 
+  s_it = mapply(FUN=function(x,y) {sum(x$benchmark[x$species %in% y$species])/sum(x$benchmark)}, 
                 x=focal_bench, y=focal_s, SIMPLIFY=T, USE.NAMES=F)
-
+  ########################
+  s_it[is.na(s_it)] <- 0 # added by OL Pescott Apr 2024, as apparently sometimes x$benchmark can be zero (and so s_it is NaN)
   # Calculate weights to downweight infrequenctly sampled locations 
   # i.e. seeing fewer than 9.95% of the benchmark species (s_it<0.0995)
   w = rep(1, each=length(locationList))
-  w[s_it<0.0995] = 10*s_it[s_it<0.0995]+0.005
+  w[s_it<0.0995] = 10*s_it[s_it<0.0995]+0.005 
 
   focal_s2 = split(s_data, factor(s_data$species, levels=spList))
   sumP_ijtw =  unlist(lapply(FUN=function(X){sum(w[locationList%in%X$location])}, 
@@ -178,7 +193,8 @@ trend = function(s_data, freq.out) {
   # and P_ijt is prob of observing species j in hectad i at time t
   Q_ijt = lapply(FUN=function(x){y=-log1p(-x); y[y>3.912023]=3.912023; return(y)}, X=sf)
 
-  x = rep(NA, times=length(spList))   # Vector to contain the time factors
+  StDev = x = xSD = rep(NA, times=length(spList))   # Vector to contain the time factors
+  sptot1 = estvar = rep(0, times=length(spList))   # Vector to contain the time factor standard deviations
   for (i in 1:length(spList)) {
     # Rescale frequencies by effort for all hectads
     # tmp = subset(freq.out, species==spList[s])
@@ -192,16 +208,51 @@ trend = function(s_data, freq.out) {
     
     # Select a x max that ensire a sign change in min_trend_fun
     if (any(Q_ijt[[i]]>0)) {
-      xMax = 5
+      xMax = 5 # Yearsley original
+      #xMax = 1
       while(min_trend_fun(xMax, Q_ijt[[i]], w, sumP_ijtw[i])<0) {xMax = xMax+5}
-      sol = uniroot(min_trend_fun,interval=c(0,xMax), tol=0.01, Q_ijt[[i]], w, sumP_ijtw[i])
+      sol = uniroot(min_trend_fun,interval=c(0,xMax), tol=0.0005, Q_ijt[[i]], w, sumP_ijtw[i])
       x[i] = sol$root
+      #x = sol$root
+      #i = 52
+      #####################################################
+      ## Following is for calculation of time factor SDs ##
+      ############ Oli Pescott, Apr 2024 ##################
+      #####################################################
+      estvar[i] = sum((1-exp(-Q_ijt[[i]]*x[i])) * (1-(1-exp(-Q_ijt[[i]]*x[i]))) * w * w)
+      sptot1[i] = sumP_ijtw[i] + sqrt(estvar[i]) 
+      xSD[i] <- sptot1[i]/(sumP_ijtw[i]+0.0000001)
+      while(min_trend_fun(xSD[i], Q_ijt[[i]], w, sptot1[i])<0) {xSD[i]  = xSD[i] + 1}
+      sol2 = uniroot(min_trend_fun,interval=c(0,xSD[i]), tol=0.0005, Q_ijt[[i]], w, sptot1[i])
+      xSD[i] = sol2$root
+      StDev[i] = abs(xSD[i] - x[i])
     }
   }
-  
-  return(data.frame(species=spList, time=timeBin, tFactor=x))
+  df <- data.frame(species=spList, time=timeBin, tFactor=x, StDev = StDev, estvar=estvar, sptot1=sptot1)
+#  df <- data.frame(species=spList, time=timeBin, tFactor=x, StDev = StDev, spt = sumP_ijtw, est = Q_ijt)
+  df <- df[order(df$species, df$time),]
+  return(df)
+  #return(data.frame(species=spList, time=timeBin, tFactor=x, StDev = StDev, estvar=estvar, sptot1=sptot1))
+  #return(c(data.frame(species=spList, time=timeBin, tFactor=x, StDev = StDev, estvar=estvar, sptot1=sptot1)), estvals)
+  #return(data.frame(species=spList, time=timeBin, tFactor=x))
 }
 
+min_trend_fun = function(x, Q, w, sumPw) {
+  # A function to solve sum_i P_ijt * w_i = sum_i (1-exp(-Q_ijt*x))*w_i in the Frescalo trend analysis Hill (2012)
+  # P_ijt = 1-exp(-Q_ijt*x)
+  # w_i is a weighting factor to downweight area with low fraction of benchmark species (s_it<0.095)
+  # P_ijt = probability of observing species j in region i at time t
+  return(sum((1-exp(-Q*x))*w) - sumPw)
+}
+
+cfun = function(...) {
+  # Bespoke function to combine the output from the frescalo() function
+  input_list <- list(...)
+  return(list(frescalo.out=Reduce('rbind',Map(function(x){x[[1]]},input_list)), 
+              freq.out=Reduce('rbind',Map(function(x){x[[2]]},input_list))))
+}
+
+#######################################################
 # This function was written to validate the approach of FRESCALO
 # trend2 = function(s_data, freq.out) {
 #   # Function to calculate the scaling factor for each species in a single year bin
@@ -285,21 +336,3 @@ trend = function(s_data, freq.out) {
 #   return(data.frame(species=spList, time=timeBin, tFactor=x))
 # }
 
-
-cfun = function(...) {
-  # Bespoke function to combine the output from the frescalo() function
-  input_list <- list(...)
-  return(list(frescalo.out=Reduce('rbind',Map(function(x){x[[1]]},input_list)), 
-              freq.out=Reduce('rbind',Map(function(x){x[[2]]},input_list))))
-}
-
-
-min_trend_fun = function(x, Q, w, sumPw) {
-  # A function to solve sum_i P_ijt * w_i = sum_i (1-exp(-Q_ijt*x))*w_i in the Frescalo trend analysis Hill (2012)
-  # P_ijt = 1-exp(-Q_ijt*x)
-  # w_i is a weighting factor to downweight area with low fraction of benchmark species (s_it<0.095)
-  # P_ijt = probability of observing species j in region i at time t
-  
-  return(sum((1-exp(-Q*x))*w) - sumPw)
-}
-#######################################################
