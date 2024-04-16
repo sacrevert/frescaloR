@@ -69,9 +69,10 @@ speciesNames = as.character(unique(s$species))   # Create list of unique species
 locationGroups = as.factor(rep(c(1:ceiling(length(spLocations)/chunkSize)),each=chunkSize))
 sSplit = split(s, locationGroups[match(s$location, spLocations)])  # Split species data up into hectads
 
-idx = iter(sSplit)
-speciesList <- foreach(spList = idx, .inorder=T, .combine='c') %dopar% {
-  speciesListFun(spList = spList, species = speciesNames) # which species are in each location?
+#idx = iter(sSplit)
+#speciesList <- foreach(spList = 1:length(sSplit), .inorder=T, .combine='c') %dopar% {
+speciesList <- foreach(i = 1:length(sSplit), .inorder=T, .combine='c') %dopar% {
+  speciesListFun(spList = sSplit[[i]], species = speciesNames) # which species are in each location?
 }
 #head(speciesList[[1]])
 # Add an additional species list where everything is absent -- assume this was about testing missing.data option? -- OLP, March 2023
@@ -123,6 +124,23 @@ if (trend_analysis) {
 
 stopCluster(cl)
 gc()
+
+## Check against fortran outputs
+load(file = "data/unicorn_TF.rda")
+fortranTrend <- unicorn_TF$trend
+names(fortranTrend)[1:2] <- c("species","time")
+trend.out$time <- ifelse(trend.out$time == 1, 1984.5, 1994.5)
+## Note that the parallel frescalo currently drops species/time period combinations where the species was completely absent
+tfCompare1 <- merge(fortranTrend, trend.out, 
+                   by = c("time", "species"), all = T)
+head(tfCompare1)
+tfCompare2 <- merge(fortranTrend, trend.out, 
+                   by = c("time", "species"), all.y = T) # drop NAs in x for correlation
+cor(tfCompare2$tFactor, tfCompare2$TFactor) # 0.996
+plot(tfCompare2$tFactor, tfCompare2$TFactor, main = "Time factors") # 
+abline(a = 0, b = 1)
+
+
 
 # source('../R_Scripts/os2eastnorth.R')
 # 
