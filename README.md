@@ -13,6 +13,7 @@ More information about FRESCALO at http://www.brc.ac.uk/biblio/frescalo-computer
 
 ## Updates Apr. 2024 by Oli Pescott
 - Added calculation of standard deviations and fixed some bugs encountered with sparse data.
+- Minor changes so that species that are absent from a time period are not dropped from the results.
 - Included dataset and weights from [sparta](https://github.com/biologicalRecordsCentre/sparta) used to check all outputs. Matched against original fortran and this independent R coding based on direct translation from fortran: https://github.com/sacrevert/fRescalo 
 - `unicorn_TF.rda` includes the results from running the original fortran code on the test data `clusterTestDat.csv` with the weights in `GB_LC_Wts.txt`.
 
@@ -21,5 +22,5 @@ Under development, but see https://rpubs.com/sacrevert/parallelFrescalo (code in
 To add:
 - Bayesian meta-regression example
 - Maps of corrected P_ijt
-- Comparison with sparta/fortran results?
+- ~Comparison with sparta/fortran results?~ DONE
 - Map of alpha?
