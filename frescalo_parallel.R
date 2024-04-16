@@ -4,7 +4,7 @@
 #
 # This has been checked against Frescalo output and it agrees
 #
-# Written by Jon Yearsley (jon.yearsley@ucd.ie) 2nd Sept 2016
+# Written by Jon Yearsley (jon.yearsley@ucd.ie) 2nd Sept 2016, modified by Oli Pescott (olipes@ceh.ac.uk), April 2024
 
 # Modified:
 # 6/9/2016 (JY): Data sent to cluster nodes in chunks (variable=chunkSize)
@@ -69,8 +69,6 @@ speciesNames = as.character(unique(s$species))   # Create list of unique species
 locationGroups = as.factor(rep(c(1:ceiling(length(spLocations)/chunkSize)),each=chunkSize))
 sSplit = split(s, locationGroups[match(s$location, spLocations)])  # Split species data up into hectads
 
-#idx = iter(sSplit)
-#speciesList <- foreach(spList = 1:length(sSplit), .inorder=T, .combine='c') %dopar% {
 speciesList <- foreach(i = 1:length(sSplit), .inorder=T, .combine='c') %dopar% {
   speciesListFun(spList = sSplit[[i]], species = speciesNames) # which species are in each location?
 }
@@ -104,16 +102,12 @@ write.table(format(output$freq.out[order(output$freq.out$location, output$freq.o
 if (trend_analysis) {
   # Do the Frescalo trend analysis if there are more than 1 year bins (use same location groups as sSplit)
   sSplit2 = split(s, as.factor(s$time))  # Split species data up into year bins
-  #idx3 = iter(sSplit2)
-  #trend.out <- foreach(s_data=idx3, .inorder=T, .combine='rbind') %dopar% {
   trend.out <- foreach(i=1:length(sSplit2), .inorder=T, .combine='rbind') %dopar% {
-    #trend(s_data = sSplit2[[i]], output$freq.out, calcSD = T)
     trend(s_data = sSplit2[[i]], output$freq.out)
-    #trendResult <- trend(s, outTestAll$freq.out)
-    #trend(s_data, output$freq.out)
   }
 }
 head(trend.out, n = 25)
+#View(trend.out)
 
 ################################################################
 
@@ -140,8 +134,6 @@ plot(tfCompare$tFactor, tfCompare$TFactor, main = "Time factors") #
 abline(a = 0, b = 1)
 plot(tfCompare$StDev.x, tfCompare$StDev.y, main = "Time factor SDs") # 
 abline(a = 0, b = 1)
-
-
 
 # source('../R_Scripts/os2eastnorth.R')
 # 
