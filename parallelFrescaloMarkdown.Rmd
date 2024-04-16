@@ -141,6 +141,7 @@ abline(a = 0, b = 1)
 Apart from a couple of small discrepancies (which are likely due to the small, sparse dataset used for this example), the outputs are extremely close! Returning to general visualisation of the results, we can plot the trend for a species, along with the time factor standard deviations, as follows.
 
 ```{r message=TRUE, eval = TRUE, warning=FALSE, include=TRUE}
+trend.out$time <- ifelse(trend.out$time == 1984.5, 1, 2) # recode back to original time bins
 sppToPlot <- trend.out[trend.out$species=="Species 1",]
 plot(1,type='n',
      ylim = c(0,1.0),
