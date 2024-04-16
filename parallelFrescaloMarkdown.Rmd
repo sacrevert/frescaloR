@@ -118,7 +118,27 @@ head(trend.out, n = 25)
 stopCluster(cl) # stop cluster
 ```
 
-There are various things that we can do with these outputs. The most obvious being to plot the time trend for any given species, along with its standard deviations.
+There are various things that we can do with these outputs. The most obvious being to plot the time trend for any given species, along with its standard deviations. First though, let us check that we have got the same results that the original fortran program produces for this dataset.
+
+```{r message=TRUE, eval = TRUE, warning=FALSE, include=TRUE}
+## Check against fortran outputs
+load(file = here("data/unicorn_TF.rda"))
+fortranTrend <- unicorn_TF$trend
+names(fortranTrend)[1:2] <- c("species","time")
+trend.out$time <- ifelse(trend.out$time == 1, 1984.5, 1994.5)
+tfCompare <- merge(fortranTrend, trend.out, by = c("time", "species"))
+# Time factors
+cor(tfCompare$tFactor, tfCompare$TFactor) # 0.996
+# Time factors SDs
+cor(tfCompare$StDev.x, tfCompare$StDev.y) # 0.998
+par(mfrow=c(1,2))
+plot(tfCompare$tFactor, tfCompare$TFactor, main = "Time factors") # 
+abline(a = 0, b = 1)
+plot(tfCompare$StDev.x, tfCompare$StDev.y, main = "Time factor SDs") # 
+abline(a = 0, b = 1)
+```
+
+Apart from a couple of small discrepancies (which are likely due to the small, sparse dataset used for this example), the outputs are extremely close! Returning to general visualisation of the results, we can plot the trend for a species, along with the time factor standard deviations, as follows.
 
 ```{r message=TRUE, eval = TRUE, warning=FALSE, include=TRUE}
 sppToPlot <- trend.out[trend.out$species=="Species 1",]
