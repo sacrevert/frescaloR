@@ -164,9 +164,14 @@ trend = function(s_data, freq.out) {
     warning('More than one time bin supplied to trend() function')
   }
   #freq.out <- output$freq.out
+  #sSplit2 = split(s, as.factor(s$time))
   #s_data = sSplit2[[1]]
+  #Species 5 in time period has zero TF, check how I cna keep this
   locationList = as.character(unique(freq.out$location))
-  spList = unique(s_data$species)
+  #spList = unique(s_data$species)
+  # OLP: use full list of species so that time-period specific zeros are kept
+  spList = unique(s$species)
+  
 
   # Calculate the proportion of benchmark species in each hectad (for this time bin)
   focal_s = split(s_data, factor(s_data$location, levels=locationList))
@@ -222,7 +227,8 @@ trend = function(s_data, freq.out) {
       sptot1[i] = sumP_ijtw[i] + sqrt(estvar[i]) 
       xSD[i] <- sptot1[i]/(sumP_ijtw[i]+0.0000001)
       while(min_trend_fun(xSD[i], Q_ijt[[i]], w, sptot1[i])<0) {xSD[i]  = xSD[i] + 1}
-      sol2 = uniroot(min_trend_fun,interval=c(0,xSD[i]), tol=0.0005, Q_ijt[[i]], w, sptot1[i])
+      # Small value added to xSD[i] to accommodate species with no data in a time bin (stops uniroot failing)
+      sol2 = uniroot(min_trend_fun,interval=c(0,xSD[i]+1.0E-10), tol=0.0005, Q_ijt[[i]], w, sptot1[i])
       xSD[i] = sol2$root
       StDev[i] = abs(xSD[i] - x[i])
     }
