@@ -60,9 +60,8 @@ speciesNames = as.character(unique(s$species))  # create list of unique species
 # For each region record presence/absence of each species
 locationGroups = as.factor(rep(c(1:ceiling(length(spLocations)/chunkSize)),each=chunkSize))
 sSplit = split(s, locationGroups[match(s$location, spLocations)])  # Split species data up into hectads
-idx = iter(sSplit)
-speciesList <- foreach(spList = idx, .inorder=T, .combine='c') %dopar% {
-  speciesListFun(spList = spList, species = speciesNames) # which species are in each location?
+speciesList <- foreach(i = 1:length(sSplit), .inorder=T, .combine='c') %dopar% {
+  speciesListFun(spList = sSplit[[i]], species = speciesNames) # which species are in each location?
 }
 
 # For each focal regional calculate the sampling intensity multipler alpha_i
