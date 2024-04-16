@@ -130,14 +130,15 @@ load(file = "data/unicorn_TF.rda")
 fortranTrend <- unicorn_TF$trend
 names(fortranTrend)[1:2] <- c("species","time")
 trend.out$time <- ifelse(trend.out$time == 1, 1984.5, 1994.5)
-## Note that the parallel frescalo currently drops species/time period combinations where the species was completely absent
-tfCompare1 <- merge(fortranTrend, trend.out, 
-                   by = c("time", "species"), all = T)
-head(tfCompare1)
-tfCompare2 <- merge(fortranTrend, trend.out, 
-                   by = c("time", "species"), all.y = T) # drop NAs in x for correlation
-cor(tfCompare2$tFactor, tfCompare2$TFactor) # 0.996
-plot(tfCompare2$tFactor, tfCompare2$TFactor, main = "Time factors") # 
+tfCompare <- merge(fortranTrend, trend.out, by = c("time", "species"))
+# Time factors
+cor(tfCompare$tFactor, tfCompare$TFactor) # 0.996
+# Time factors SDs
+cor(tfCompare$StDev.x, tfCompare$StDev.y) # 0.998
+par(mfrow=c(1,2))
+plot(tfCompare$tFactor, tfCompare$TFactor, main = "Time factors") # 
+abline(a = 0, b = 1)
+plot(tfCompare$StDev.x, tfCompare$StDev.y, main = "Time factor SDs") # 
 abline(a = 0, b = 1)
 
 
