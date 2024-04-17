@@ -102,19 +102,24 @@ write.table(format(output$freq.out[order(output$freq.out$location, output$freq.o
 if (trend_analysis) {
   # Do the Frescalo trend analysis if there are more than 1 year bins (use same location groups as sSplit)
   sSplit2 = split(s, as.factor(s$time))  # Split species data up into year bins
-  trend.out <- foreach(i=1:length(sSplit2), .inorder=T, .combine='rbind') %dopar% {
+  #trend.out <- foreach(i=1:length(sSplit2), .inorder=T, .combine='rbind') %dopar% {
+  # Amend to return more than one list
+  trend.out <- foreach(i=1:length(sSplit2), .inorder=T, .combine='cfunTrend', .multicombine=TRUE) %dopar% {
     trend(s_data = sSplit2[[i]], output$freq.out)
   }
 }
-head(trend.out, n = 25)
+head(trend.out, n = 10)
+head(trend.out$trend.out, n = 10)
+site.time.out <- trend.out$site.time.out
+head(site.time.out, n = 10)
 #View(trend.out)
 
 ################################################################
 
-if (trend_analysis) {
-  write.table(format(trend.out[order(trend.out$species,trend.out$time),], digits=4, zero.print=T, width=10, scientific=F, justify='left'), 
-              file=paste(outputPrefix,'_frescalo_trend.txt',sep=''), col.names=T, row.names=F, quote=F, sep=' ')
-}
+# if (trend_analysis) {
+#   write.table(format(trend.out[order(trend.out$species,trend.out$time),], digits=4, zero.print=T, width=10, scientific=F, justify='left'), 
+#               file=paste(outputPrefix,'_frescalo_trend.txt',sep=''), col.names=T, row.names=F, quote=F, sep=' ')
+# }
 
 stopCluster(cl)
 gc()
@@ -123,8 +128,9 @@ gc()
 load(file = "data/unicorn_TF.rda")
 fortranTrend <- unicorn_TF$trend
 names(fortranTrend)[1:2] <- c("species","time")
-trend.out$time <- ifelse(trend.out$time == 1, 1984.5, 1994.5)
-tfCompare <- merge(fortranTrend, trend.out, by = c("time", "species"))
+para.trend <- trend.out$trend.out
+para.trend$time <- ifelse(para.trend$time == 1, 1984.5, 1994.5)
+tfCompare <- merge(fortranTrend, para.trend, by = c("time", "species"))
 # Time factors
 cor(tfCompare$tFactor, tfCompare$TFactor) # 0.996
 # Time factors SDs
