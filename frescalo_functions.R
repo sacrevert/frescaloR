@@ -172,19 +172,22 @@ trend = function(s_data, freq.out) {
   # OLP: use full list of species so that time-period specific zeros are kept
   spList = unique(s$species)
   
-
   # Calculate the proportion of benchmark species in each hectad (for this time bin)
   focal_s = split(s_data, factor(s_data$location, levels=locationList))
   focal_bench = split(freq.out, factor(freq.out$location, levels=locationList))
   s_it = mapply(FUN=function(x,y) {sum(x$benchmark[x$species %in% y$species])/sum(x$benchmark)}, 
                 x=focal_bench, y=focal_s, SIMPLIFY=T, USE.NAMES=F)
-  ########################
   s_it[is.na(s_it)] <- 0 # added by OL Pescott Apr 2024, as apparently sometimes x$benchmark can be zero (and so s_it is NaN)
   # Calculate weights to downweight infrequenctly sampled locations 
   # i.e. seeing fewer than 9.95% of the benchmark species (s_it<0.0995)
   w = rep(1, each=length(locationList))
   w[s_it<0.0995] = 10*s_it[s_it<0.0995]+0.005 
-
+  # Add site x time period recording effort info to output
+  site.time.out <- data.frame(location = locationList, 
+                                          time = rep(unique(s_data$time), times = length(locationList)), 
+                                          s_it = s_it, 
+                                          w = w)
+  
   focal_s2 = split(s_data, factor(s_data$species, levels=spList))
   sumP_ijtw =  unlist(lapply(FUN=function(X){sum(w[locationList%in%X$location])}, 
                      X=focal_s2), use.names=F)
@@ -236,7 +239,8 @@ trend = function(s_data, freq.out) {
   df <- data.frame(species=spList, time=timeBin, tFactor=x, StDev = StDev, estvar=estvar, sptot1=sptot1)
 #  df <- data.frame(species=spList, time=timeBin, tFactor=x, StDev = StDev, spt = sumP_ijtw, est = Q_ijt)
   df <- df[order(df$species, df$time),]
-  return(df)
+  #return(df)
+  return(list(trend.out = df, site.time.out = site.time.out ))
   #return(data.frame(species=spList, time=timeBin, tFactor=x, StDev = StDev, estvar=estvar, sptot1=sptot1))
   #return(c(data.frame(species=spList, time=timeBin, tFactor=x, StDev = StDev, estvar=estvar, sptot1=sptot1)), estvals)
   #return(data.frame(species=spList, time=timeBin, tFactor=x))
@@ -255,6 +259,13 @@ cfun = function(...) {
   input_list <- list(...)
   return(list(frescalo.out=Reduce('rbind',Map(function(x){x[[1]]},input_list)), 
               freq.out=Reduce('rbind',Map(function(x){x[[2]]},input_list))))
+}
+
+cfunTrend = function(...) {
+  # Another bespoke function to combine the output from the trend() function
+  input_list <- list(...)
+  return(list(trend.out=Reduce('rbind',Map(function(x){x[[1]]},input_list)), 
+              site.time.out=Reduce('rbind',Map(function(x){x[[2]]},input_list))))
 }
 
 #######################################################
