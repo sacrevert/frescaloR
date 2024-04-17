@@ -116,11 +116,11 @@ head(site.time.out, n = 10)
 
 ################################################################
 
+# If we were saving output:
 # if (trend_analysis) {
-#   write.table(format(trend.out[order(trend.out$species,trend.out$time),], digits=4, zero.print=T, width=10, scientific=F, justify='left'), 
+#   write.table(format(trend.out$trend.out[order(trend.out$trend.out$species,trend.out$time),], digits=4, zero.print=T, width=10, scientific=F,   justify='left'), 
 #               file=paste(outputPrefix,'_frescalo_trend.txt',sep=''), col.names=T, row.names=F, quote=F, sep=' ')
 # }
-
 stopCluster(cl)
 gc()
 
@@ -141,12 +141,17 @@ abline(a = 0, b = 1)
 plot(tfCompare$StDev.x, tfCompare$StDev.y, main = "Time factor SDs") # 
 abline(a = 0, b = 1)
 
-# source('../R_Scripts/os2eastnorth.R')
-# 
-# en=os2eastnorth(GR=output$frescalo.out$location, hectad=T)$en
-# output$frescalo.out$x = en[,1]
-# output$frescalo.out$y = en[,2]
-# 
-# library(ggplot2)
-# 
-# ggplot(data=output$frescalo.out, aes(x=x, y=y, colour=alpha)) + geom_point()
+## Site x time period x species predicted occupancies
+# Following Biljsma (2013), this part takes the rescaled species frequencies (freq1) from the frescalo() function, and the 
+# mean species time factor for a time period from the trend() function, and uses them to predict
+# species occupancy under standard recording effort (i.e. when s_it = 1)
+head(output$freq.out)
+head(output$freq.out[output$freq.out$species=="Species 1",])
+head(para.trend)
+list_data2 <- by(data = output$freq.out, as.factor(output$freq.out$species), function(x) createPijt(x, trend = para.trend))
+options(scipen = 999)
+occ.out <- do.call(rbind, list_data2)
+row.names(occ.out) <- 1:nrow(occ.out)
+occ.out$P_ijt <- round(occ.out$P_ijt, digits = 3)
+hist(occ.out$P_ijt)
+
