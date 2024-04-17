@@ -20,7 +20,6 @@ More information about FRESCALO at http://www.brc.ac.uk/biblio/frescalo-computer
 
 ## Tutorial
 Under development, but see https://rpubs.com/sacrevert/parallelFrescalo (code in this repo [here](https://github.com/sacrevert/frescaloR/blob/master/parallelFrescaloMarkdown.Rmd)).
-To add:
+TO DO:
 - Bayesian meta-regression example
 - Maps of corrected P_ijt
-- ~Comparison with sparta/fortran results?~ DONE
