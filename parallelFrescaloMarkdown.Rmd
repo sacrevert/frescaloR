@@ -1,7 +1,7 @@
 ---
 title: "An introduction to the use of parallelised Frescalo for time-trends in species occurrence
   data collected with variable effort"
-authors: Drs Oli Pescott and Jon Yearsley
+authors: "Dr Oli Pescott, based on code originally created by Dr Jon Yearsley"
 date: 12th April 2024
 output:
   html_document:
@@ -97,21 +97,28 @@ require(knitr, quietly=T)
 include_graphics(here("outputs/species_frequency_animation.gif"))
 ```
 
-Finally, we perform the frescalo trend analysis. In the original fortran code, this was subroutine "tfcalc". The `trend.out` object was simply described in the original frescalo README as "listing of time factors for species", although the standard deviations of these are also included.
+Finally, we perform the frescalo trend analysis. In the original fortran code, this was subroutine "tfcalc". The `trend.out` object was simply described in the original frescalo README as "listing of time factors for species", although the standard deviations of these are also included. We have amended this function to also return the site x time period recording effort information. This comprises two important things: (i) Information on s_it, the proportion of benchmarks recorded for a site within a time period, and (ii), w, an additional weight used by Hill to reduce the influence of site x time period combinations which have very few benchmarks and which are therefore considered to have received no systematic sampling effort in a time period. This addition was not described in the main paper of Hill (2012), but it present in the fortran code and the original Frescalo README file packaged with the fortran executable. To quote Hill's README:
+
+>"In FRESCALO, data from times at a location in which the proportion of benchmark species (recording effort) is less than 0.1 are given low weight, ranging >linearly from a minimum of 0.05 to 1.0 if sampling effort is 0.095.  The logic of this is that where no systematic sample is taken, observations are isolated >and unsupported, and are rather unsuitable for calculating time factors."
+
+The relevant line of code in the current implementation is `w[s_it<0.0995] = 10*s_it[s_it<0.0995]+0.005`, following the original fortran.
 
 ```{r message=TRUE, eval = TRUE, warning=FALSE, include=TRUE}
 # Trend analysis
 if (trend_analysis) {
   # Do the Frescalo trend analysis if there are more than 1 year bins (use same location groups as sSplit)
   sSplit2 = split(s, as.factor(s$time))  # Split species data up into year bins
-  trend.out <- foreach(i=1:length(sSplit2), .inorder=T, .combine='rbind') %dopar% {
+  trend.out <- foreach(i=1:length(sSplit2), .inorder=T, .combine='cfunTrend', .multicombine=TRUE) %dopar% {
     trend(s_data = sSplit2[[i]], output$freq.out)
   }
 }
-head(trend.out, n = 25)
-# If we were saving output:
+# View outputs
+head(trend.out$trend.out, n = 10) # Trend information
+site.time.out <- trend.out$site.time.out # Site x time period sampling effort information
+head(site.time.out, n = 10)
+# If we were saving trend output:
 # if (trend_analysis) {
-#   write.table(format(trend.out[order(trend.out$species,trend.out$time),], digits=4, zero.print=T, width=10, scientific=F, justify='left'), 
+#   write.table(format(trend.out$trend.out[order(trend.out$trend.out$species,trend.out$time),], digits=4, zero.print=T, width=10, scientific=F,   justify='left'), 
 #               file=paste(outputPrefix,'_frescalo_trend.txt',sep=''), col.names=T, row.names=F, quote=F, sep=' ')
 # }
 
@@ -125,8 +132,9 @@ There are various things that we can do with these outputs. The most obvious bei
 load(file = here("data/unicorn_TF.rda"))
 fortranTrend <- unicorn_TF$trend
 names(fortranTrend)[1:2] <- c("species","time")
-trend.out$time <- ifelse(trend.out$time == 1, 1984.5, 1994.5)
-tfCompare <- merge(fortranTrend, trend.out, by = c("time", "species"))
+para.trend <- trend.out$trend.out
+para.trend$time <- ifelse(para.trend$time == 1, 1984.5, 1994.5)
+tfCompare <- merge(fortranTrend, para.trend, by = c("time", "species"))
 # Time factors
 cor(tfCompare$tFactor, tfCompare$TFactor) # 0.996
 # Time factors SDs
@@ -141,8 +149,8 @@ abline(a = 0, b = 1)
 Apart from a couple of small discrepancies (which are likely due to the small, sparse dataset used for this example), the outputs are extremely close! Returning to general visualisation of the results, we can plot the trend for a species, along with the time factor standard deviations, as follows.
 
 ```{r message=TRUE, eval = TRUE, warning=FALSE, include=TRUE}
-trend.out$time <- ifelse(trend.out$time == 1984.5, 1, 2) # recode back to original time bins
-sppToPlot <- trend.out[trend.out$species=="Species 1",]
+para.trend$time <- ifelse(para.trend$time == 1984.5, 1, 2) # recode back to original time bins
+sppToPlot <- para.trend[para.trend$species=="Species 1",]
 plot(1,type='n',
      ylim = c(0,1.0),
 xlim = c(0.75,2.25), xlab = 'Time', ylab ='Relative frequency', 
