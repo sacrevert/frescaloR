@@ -195,3 +195,18 @@ for (i in seq_along(out2)[1]){ # taken and simplified from existing code across 
   points(x = spLs[[i]]$time, y = spLs[[i]]$tFactor, pch = 21, col = "black", cex = 0.8, bg = "white")
 }
 ```
+
+We can also produce the data required to make maps of the predicted species occupancies for different time periods, as first suggested by [Bijlsma (2013)](https://www.blwg.nl/mossen/onderzoek/rapporten/BLWGRapport15.pdf). This works by setting s_it to 1, and then using a species' time factor per time period to adjust a species all-time local frequency estimate (`freq_1` from the `freq.out` object returned by the `frescalo()` function above, or f\`_ij from the original paper of Hill 2012). Ideally these estimates would also take uncertainty in `freq_1` and in the time factor estimates into account, although we do not pursue that development here.
+
+```{r message=TRUE, eval = TRUE, warning=FALSE, include=TRUE}
+head(output$freq.out[output$freq.out$species=="Species 1",])
+head(para.trend)
+# using createPijt function from frescalo_functions.R file
+list_data2 <- by(data = output$freq.out, as.factor(output$freq.out$species), function(x) createPijt(x, trend = para.trend))
+options(scipen = 999)
+occ.out <- do.call(rbind, list_data2)
+row.names(occ.out) <- 1:nrow(occ.out)
+occ.out$P_ijt <- round(occ.out$P_ijt, digits = 3)
+hist(occ.out$P_ijt) # show distribution of predicted occupancies
+```
+
