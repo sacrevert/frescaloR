@@ -237,13 +237,8 @@ trend = function(s_data, freq.out) {
     }
   }
   df <- data.frame(species=spList, time=timeBin, tFactor=x, StDev = StDev, estvar=estvar, sptot1=sptot1)
-#  df <- data.frame(species=spList, time=timeBin, tFactor=x, StDev = StDev, spt = sumP_ijtw, est = Q_ijt)
   df <- df[order(df$species, df$time),]
-  #return(df)
   return(list(trend.out = df, site.time.out = site.time.out ))
-  #return(data.frame(species=spList, time=timeBin, tFactor=x, StDev = StDev, estvar=estvar, sptot1=sptot1))
-  #return(c(data.frame(species=spList, time=timeBin, tFactor=x, StDev = StDev, estvar=estvar, sptot1=sptot1)), estvals)
-  #return(data.frame(species=spList, time=timeBin, tFactor=x))
 }
 
 min_trend_fun = function(x, Q, w, sumPw) {
@@ -267,6 +262,33 @@ cfunTrend = function(...) {
   return(list(trend.out=Reduce('rbind',Map(function(x){x[[1]]},input_list)), 
               site.time.out=Reduce('rbind',Map(function(x){x[[2]]},input_list))))
 }
+
+# Addtional function for creating P_ijt values
+createPijt <- function(x, trend){
+  list_data <- by(data = x, as.factor(x$location), function(x) (1-(1-x$freq_1^trend[trend$species==x$species,]$tFactor)))
+  # Initialize variables
+  species <- vector("list", length(list_data))
+  IDs <- vector("list", length(list_data))
+  Values <- vector("list", length(list_data))
+  Labels <- vector("list", length(list_data))
+  labels <- unique(trend$time) # Label vector
+  # Populate the variables with data from the list
+  for (i in seq_along(list_data)) {
+    species[[i]] <- rep(unique(x$species), times = length(list_data[[i]]))
+    IDs[[i]] <- rep(names(list_data)[i], times = length(list_data[[i]]))
+    Values[[i]] <- list_data[[i]]
+    Labels[[i]] <- labels
+  }
+  # Combine all elements into vectors
+  species <- unlist(species)
+  IDs <- unlist(IDs)
+  Values <- unlist(Values)
+  Labels <- unlist(Labels)
+  df <- data.frame(species = species, location = IDs, time = Labels, P_ijt = Values)
+  return(df)
+}  
+
+
 
 #######################################################
 # This function was written to validate the approach of FRESCALO
