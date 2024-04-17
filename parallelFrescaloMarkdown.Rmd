@@ -1,7 +1,7 @@
 ---
 title: "An introduction to the use of parallelised Frescalo for time-trends in species occurrence
   data collected with variable effort"
-authors: "Dr Oli Pescott, based on code originally created by Dr Jon Yearsley"
+author: "Dr Oli Pescott, based on code originally created by Dr Jon Yearsley"
 date: 12th April 2024
 output:
   html_document:
