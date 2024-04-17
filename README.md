@@ -15,6 +15,7 @@ More information about FRESCALO at http://www.brc.ac.uk/biblio/frescalo-computer
 - Added calculation of standard deviations and fixed some bugs encountered with sparse data.
 - Minor changes so that species that are absent from a time period are not dropped from the results.
 - Added s_it and w (site x time period recording effort metrics) to the `trend()` function outputs.
+- Added function to calculate species x sites x time period predicted occupancies (P_ijt).
 - Included dataset and weights from [sparta](https://github.com/biologicalRecordsCentre/sparta) used to check all outputs. Matched against original fortran and this independent R coding based on direct translation from fortran: https://github.com/sacrevert/fRescalo 
 - `unicorn_TF.rda` includes the results from running the original fortran code on the test data `clusterTestDat.csv` with the weights in `GB_LC_Wts.txt`.
 
@@ -22,4 +23,3 @@ More information about FRESCALO at http://www.brc.ac.uk/biblio/frescalo-computer
 Under development, but see https://rpubs.com/sacrevert/parallelFrescalo (code in this repo [here](https://github.com/sacrevert/frescaloR/blob/master/parallelFrescaloMarkdown.Rmd)).
 TO DO:
 - Bayesian meta-regression example
-- Maps of corrected P_ijt
