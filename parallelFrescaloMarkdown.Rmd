@@ -207,6 +207,7 @@ options(scipen = 999)
 occ.out <- do.call(rbind, list_data2)
 row.names(occ.out) <- 1:nrow(occ.out)
 occ.out$P_ijt <- round(occ.out$P_ijt, digits = 3)
+head(occ.out, n = 5)
 hist(occ.out$P_ijt) # show distribution of predicted occupancies
 ```
 
