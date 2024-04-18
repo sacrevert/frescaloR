@@ -265,7 +265,7 @@ cfunTrend = function(...) {
 
 # Addtional function for creating P_ijt values
 createPijt <- function(x, trend){
-  list_data <- by(data = x, as.factor(x$location), function(x) (1-(1-x$freq_1^trend[trend$species==x$species,]$tFactor)))
+  list_data <- by(data = x, as.factor(x$location), function(x) (1-(1-x$freq_1)^trend[trend$species==x$species,]$tFactor))
   # Initialize variables
   species <- vector("list", length(list_data))
   IDs <- vector("list", length(list_data))
