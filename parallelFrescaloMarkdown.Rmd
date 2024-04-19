@@ -75,7 +75,7 @@ output <- foreach(i=1:length(dSplit), .inorder=T, .combine='cfun', .multicombine
 }
 ```
 
-We now have our two output tables. `output$frescalo.out` is the equivalent of the "location report" `samples.txt` from the original fortran program. This provides site- and neighbourhood-level information relating to the rescaling of the frequency-weighted mean frequency ($\phi_{i}$, i.e. phi_i) across neighbourhoods (e.g. $\alpha_{i}$, the multiplier used to adjust species local frequencies in a neighbourhood so that all $\phi_{i} = \Phi$), and derived quantitites.
+We now have our two output tables. `output$frescalo.out` is the equivalent of the "location report" `samples.txt` from the original fortran program. This provides site- and neighbourhood-level information relating to the rescaling of the frequency-weighted mean frequency ($\phi_{i}$, i.e. phi_i) across neighbourhoods (e.g. $\alpha_{i}$, the multiplier used to adjust species local frequencies in a neighbourhood so that a neighbourhood's $\phi_{i} = \Phi$), and derived quantitites.
 
 The other table `output$freq.out` is the equivalent of the "listing of rescaled species frequencies" table `frequencies.out` produced by the original fortran program. This is a table of sites x species, providing such information as the rescaled local frequencies of species across neighbourhoods, averaged across all time periods in the assessment. This can be considered as a "smoothed" or "idealised" average local frequency, from which time period-specific deviations (i.e. species' true frequencies within specific time periods) will subsequently be estimated. 
 
