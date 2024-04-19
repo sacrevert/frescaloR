@@ -17,10 +17,11 @@ require(doParallel, quietly=T)
 require(here, quietly=T)
 source(here('scripts/frescalo_functions.R')) # source required functions
 ```
-# Introducton
+
+## Introduction
 In this tutorial we  demonstrate the use of Dr Jon Yearsley's parallelised R coding of FreScaLO (Frequency Scaling using Local Occupancy; "frescalo" hereafter). The original paper of Hill (2012) is [here](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2011.00146.x). Dr Yearsley's original code is [here](https://github.com/DrJonYearsley/frescaloR), and all the code and functions relating to this tutorial can be found [here](https://github.com/sacrevert/frescaloR) (this is a forked version of Dr Yearsley's repo with additional code and functionality). The paper for which Jon created his version of frescalo is [here](https://peerj.com/articles/7035/). Note also that an alternative R translation of the original fortran is also available [here](https://github.com/sacrevert/fRescalo) — this loop-based implementation is much slower than the current parallelised version, and was done for educational purposes rather than actual use.
 
-# Required data
+## Required data
 The data in this example are dummy data derived from the "unicorns" dataset in the [sparta](https://github.com/biologicalRecordsCentre/sparta) package, filtered and arranged into two time periods. The neighbourhood weights used are those created for Great Britain at the 10 x 10 km grid scale using UKCEH Land Cover Map information, also packaged within sparta. These data have all already been prepared for use with frescalo; guidance on these steps can be found within the sparta [vignette](http://biologicalrecordscentre.github.io/sparta/articles/sparta_vignette.html). Custom weights could be created using the `sparta::createWeights()` function, or other approaches (e.g. see [here](https://github.com/sacrevert/frescaloNeighbourhoods) and [here](https://github.com/sacrevert/createIDFneighbourhood); there is also a RShiny neighbourhood weights visualisation tool [here](https://github.com/sacrevert/visualiseFresNeighbours)). In our example here the sites are 10 x 10 km squares of the British National Grid (ESPG:27700) in lettered format, the species are just represented by arbitrary names and the time bins are of unspecified lengths (for frescalo there is no particular restriction that all time periods in the analysis should be the same length).
 
 ```{r message=TRUE, warning=FALSE, include=TRUE}
@@ -34,6 +35,7 @@ names(d) <- c("location1", "location2", "w")
 head(d)
 ```
 
+## Parallel computing
 We now establish a computing cluster (here just on a local machine, but this can obviously be done on an HPC as well) using the `doParallel` library. We then also set a number of parameters and options for the frescalo algorithm (`R_star` and `Phi`).
 
 ```{r message=FALSE, warning=FALSE, include=TRUE}
@@ -50,6 +52,7 @@ outputPrefix = 'outputs/testApr24_' # relative directory path and prefix for all
 chunkSize = 250 # Number of sites or other data segments to pass to each compute node
 ```
 
+## Step 1: Frequency scaling using local occupancy
 We now prepare various required objects for the first part of the frescalo algorithm (subroutine "fresca" in the [original fortran code](https://www.brc.ac.uk/biblio/frescalo-computer-program-analyse-your-biological-records])). Broadly speaking, this part of the analysis equalises the all-time (i.e. across all time bins in the analysis) sampling intensity for each local neighbourhood in order to make them comparable for the subsequent trend assessment.
 
 ```{r message=TRUE, eval = TRUE, warning=FALSE, include=TRUE}
@@ -75,6 +78,7 @@ output <- foreach(i=1:length(dSplit), .inorder=T, .combine='cfun', .multicombine
 }
 ```
 
+## Frequency scaling outputs
 We now have our two output tables. `output$frescalo.out` is the equivalent of the "location report" `samples.txt` from the original fortran program. This provides site- and neighbourhood-level information relating to the rescaling of the frequency-weighted mean frequency ($\phi_{i}$, i.e. phi_i) across neighbourhoods (e.g. $\alpha_{i}$, the multiplier used to adjust species local frequencies in a neighbourhood so that a neighbourhood's $\phi_{i} = \Phi$), and derived quantitites.
 
 The other table `output$freq.out` is the equivalent of the "listing of rescaled species frequencies" table `frequencies.out` produced by the original fortran program. This is a table of sites x species, providing such information as the rescaled local frequencies of species across neighbourhoods, averaged across all time periods in the assessment. This can be considered as a "smoothed" or "idealised" average local frequency, from which time period-specific deviations (i.e. species' true frequencies within specific time periods) will subsequently be estimated. 
@@ -92,7 +96,8 @@ head(output$freq.out)
 #             file=paste(outputPrefix,'_frescalo_freq.txt',sep=''), col.names=T, row.names=F, quote=F, sep=' ')
 ```
 
-The following animation provides a theoretical example of how this aspect of frescalo is intended to work. This was generated using an underlying multivariate Poisson point process (representing a community or species pool within a neighbourhood), combined with thinning (i.e. less than "perfect" sampling intensity relative to retrieving the true frequencies of species in the neighbourhood) and an iterative, successive approximation, approach to then acheiving a target value of the frequency-weighted mean frequency (i.e. moving $\phi_{i}$ to the specified $\Phi$ (`Phi` in the code) value). This can be thought of as the multipler ($\alpha_{i}$) required to re-"fatten" the Poisson point process for each species. The code behind this simulation can be found [here](https://github.com/sacrevert/Frequency-rescaling-demo). The red dot shown for each curve is its empirical $\phi$ value (i.e. its frequency-weighted mean frequency). 
+## Simulated example of frequency scaling
+The following animation provides a theoretical example of how this aspect of frescalo is intended to work at the individual neighbourhood level. This was generated using an underlying multivariate Poisson point process (representing a community or species pool within a neighbourhood), combined with thinning (i.e. less than "perfect" sampling intensity relative to retrieving the true frequencies of species in the neighbourhood) and an iterative, successive approximation, approach to then acheiving a target value of the frequency-weighted mean frequency (i.e. moving $\phi_{i}$ to the specified $\Phi$ (`Phi` in the code) value). This can be thought of as the multipler ($\alpha_{i}$) required to re-"fatten" the Poisson point process for each species. The code behind this simulation can be found [here](https://github.com/sacrevert/Frequency-rescaling-demo). The red dot shown for each curve is its empirical $\phi$ value (i.e. its frequency-weighted mean frequency). 
 
 Note that a key assumption of frescalo is that neighbourhood local frequency curves contain accurate information on species relative frequencies, even when sampling effort varies across space and time. Obviously this assumption may not always be satisfied, but tends to be true at larger spatio-temporal scales, especially when the relevant spatial domain and time periods in question have experienced a reasonable level of recording. This is obviously true when there have been national recording campaigns of some sort, and, indeed, frescalo was originally designed by Hill to deal with the types of data collected in order to produce species distribution atlases.
 
@@ -101,6 +106,7 @@ require(knitr, quietly=T)
 include_graphics(here("outputs/species_frequency_animation.gif"))
 ```
 
+## Step 2: Trend analysis
 Finally, we perform the frescalo trend analysis. In the original fortran code, this was subroutine "tfcalc". The `trend.out` object was simply described in the original frescalo README as the "listing of time factors for species", although the standard deviations of these are also included. We have amended this function to also return the site x time period recording effort information used to make site/time period effort adjustments. This comprises two important things: (i) Information on $s_{it}$ (`s_it` in the code), the proportion of benchmarks recorded for a site within a time period, and (ii), w, an additional weight used by Hill to reduce the influence of site x time period combinations which have very few benchmarks and which are therefore considered to have received no systematic sampling effort in a time period. This addition was not described in the main paper of Hill (2012), but it present in the fortran code and the original Frescalo README file packaged with the fortran executable. To quote Hill's README:
 
 >"In FRESCALO, data from times at a location in which the proportion of benchmark species (recording effort) is less than 0.1 are given low weight, ranging linearly from a minimum of 0.05 to 1.0 if sampling effort is 0.095.  The logic of this is that where no systematic sample is taken, observations are isolated and unsupported, and are rather unsuitable for calculating time factors."
@@ -129,6 +135,7 @@ head(site.time.out, n = 10)
 stopCluster(cl) # stop cluster
 ```
 
+## Fortran comparison and trend output manipulation
 There are various things that we can do with these outputs. The most obvious being to plot the time trend for any given species, along with its standard deviations. First though, let us check that we have got the same results that the original fortran program produces for this dataset.
 
 ```{r message=TRUE, eval = TRUE, warning=FALSE, include=TRUE}
@@ -150,6 +157,7 @@ plot(tfCompare$StDev.x, tfCompare$StDev.y, main = "Time factor SDs") #
 abline(a = 0, b = 1)
 ```
 
+## Plot species trends
 Apart from a couple of small discrepancies (which are likely due to the small, sparse dataset used for this example), the outputs are extremely close. Returning to general visualisation of the results, we can plot the trend for a species, along with the time factor standard deviations, as follows.
 
 ```{r message=TRUE, eval = TRUE, warning=FALSE, include=TRUE}
@@ -165,6 +173,7 @@ arrows(x0 = sppToPlot$time, x1 = sppToPlot$time, y0 = sppToPlot$tFactor - sppToP
        y1 = sppToPlot$tFactor + sppToPlot$StDev, length = 0, col = "black")
 ```
 
+## Species trends with time factor uncertainty
 We can then fit a model for the linear trend for example, ideally respecting the uncertainty around the point estimates. Bootstrapped line ensembles  (see [here](https://www.sciencedirect.com/science/article/pii/S1470160X22005891) for a frescalo example) or Bayesian meta-regression are both potential options here, depending on the aim and audience.
 
 ```{r message=FALSE, eval = TRUE, warning=FALSE, include=FALSE}
@@ -200,6 +209,7 @@ for (i in seq_along(out2)[1]){ # taken and simplified from existing code across 
 }
 ```
 
+## Generate species' predicted occupancies across sites and time periods
 We can also produce the data required to make maps of the predicted species occupancies for different time periods, as first suggested by [Bijlsma (2013)](https://www.blwg.nl/mossen/onderzoek/rapporten/BLWGRapport15.pdf). This works by setting $s_{it}$ to 1, and then using a species' time factor per time period to adjust a species all-time local frequency estimate (`freq_1` from the `freq.out` object returned by the `frescalo()` function above, or $f'_{ij}$ from the original paper of Hill 2012). Ideally these estimates would also take uncertainty in `freq_1` and in the time factor estimates into account, although we do not pursue that development here.
 
 ```{r message=TRUE, eval = TRUE, warning=FALSE, include=TRUE}
