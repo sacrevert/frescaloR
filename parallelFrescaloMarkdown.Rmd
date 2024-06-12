@@ -45,7 +45,7 @@ We now establish a computing cluster (here just on a local machine, but this can
 cl <- makeCluster(3)
 registerDoParallel(cl, cores = NULL)
 
-R_star = 0.27 # Proportion of species used as benchmarks within neighbourhoods
+R_star = 0.2703 # Proportion of species used as benchmarks within neighbourhoods
 Phi = 0.74 # Target value of neighbourhood local-frequency weighted mean frequency using to standardise the cross-time period sampling intensity across neighbourhoods
 trend_analysis = TRUE # Perform trend analysis
 outputPrefix = 'outputs/testApr24_' # relative directory path and prefix for all output files
@@ -74,7 +74,7 @@ location1Groups = as.factor(rep(c(1:ceiling(length(location1List)/chunkSize)),ea
 dSplit = split(dSub, location1Groups[match(dSub$location1, location1List)])  # Split neighbourhood data up into focal regions
 # Run frescalo algorithm across chunks of neighbourhood data
 output <- foreach(i=1:length(dSplit), .inorder=T, .combine='cfun', .multicombine=TRUE) %dopar% {
-  frescalo(data_in = dSplit[[i]], speciesList, spLocations, speciesNames, Phi, R_star=0.27, missing.data = 2) # leave missing.data as 2 for fortran equivalence
+  frescalo(data_in = dSplit[[i]], speciesList, spLocations, speciesNames, Phi, R_star=R_star, missing.data = 2) # leave missing.data as 2 for fortran equivalence
 }
 ```
 
@@ -147,9 +147,9 @@ para.trend <- trend.out$trend.out
 para.trend$time <- ifelse(para.trend$time == 1, 1984.5, 1994.5)
 tfCompare <- merge(fortranTrend, para.trend, by = c("time", "species"))
 # Time factors
-cor(tfCompare$tFactor, tfCompare$TFactor) # 0.996
+cor(tfCompare$tFactor, tfCompare$TFactor) # 0.998
 # Time factors SDs
-cor(tfCompare$StDev.x, tfCompare$StDev.y) # 0.998
+cor(tfCompare$StDev.x, tfCompare$StDev.y) # 0.999
 par(mfrow=c(1,2))
 plot(tfCompare$tFactor, tfCompare$TFactor, main = "Time factors") # 
 abline(a = 0, b = 1)
