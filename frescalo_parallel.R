@@ -1,4 +1,3 @@
-
 # A script to calculate the alpha values for Frescalo 
 # The estimation of trends in species occurence has not been implemented
 #
@@ -24,10 +23,10 @@ source('scripts/frescalo_functions.R')
 # cores=NULL will automatically pick the number of cores per node 
 # (by defauult this is half the number of available cores)
 #cl <- makeCluster(12)
-cl <- makeCluster(1)
+cl <- makeCluster(3)
 registerDoParallel(cl, cores = NULL)
 
-R_star = 0.27
+R_star = 0.2703
 trend_analysis = TRUE
 
 # weight.file = './bsbi_hectads_2000_2006_2010_weights.txt'
@@ -85,7 +84,7 @@ location1Groups = as.factor(rep(c(1:ceiling(length(location1List)/chunkSize)),ea
 
 dSplit = split(dSub, location1Groups[match(dSub$location1, location1List)])  # Split neighbourhood data up into focal regions
 output <- foreach(i=1:length(dSplit), .inorder=T, .combine='cfun', .multicombine=TRUE) %dopar% {
-  frescalo(data_in = dSplit[[i]], speciesList, spLocations, speciesNames, Phi, R_star=0.27, missing.data = 2)
+  frescalo(data_in = dSplit[[i]], speciesList, spLocations, speciesNames, Phi, R_star=R_star, missing.data = 2)
 }
 head(output$frescalo.out)
 head(output$freq.out)
@@ -132,7 +131,7 @@ para.trend <- trend.out$trend.out
 para.trend$time <- ifelse(para.trend$time == 1, 1984.5, 1994.5)
 tfCompare <- merge(fortranTrend, para.trend, by = c("time", "species"))
 # Time factors
-cor(tfCompare$tFactor, tfCompare$TFactor) # 0.996
+cor(tfCompare$tFactor, tfCompare$TFactor) # 0.997
 # Time factors SDs
 cor(tfCompare$StDev.x, tfCompare$StDev.y) # 0.998
 par(mfrow=c(1,2))
@@ -145,6 +144,7 @@ abline(a = 0, b = 1)
 # Following Biljsma (2013), this part takes the rescaled species frequencies (freq1) from the frescalo() function, and the 
 # mean species time factor for a time period from the trend() function, and uses them to predict
 # species occupancy under standard recording effort (i.e. when s_it = 1)
+
 head(output$freq.out)
 head(output$freq.out[output$freq.out$species=="Species 1",])
 head(para.trend)
