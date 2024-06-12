@@ -131,9 +131,9 @@ para.trend <- trend.out$trend.out
 para.trend$time <- ifelse(para.trend$time == 1, 1984.5, 1994.5)
 tfCompare <- merge(fortranTrend, para.trend, by = c("time", "species"))
 # Time factors
-cor(tfCompare$tFactor, tfCompare$TFactor) # 0.997
+cor(tfCompare$tFactor, tfCompare$TFactor) # 0.998
 # Time factors SDs
-cor(tfCompare$StDev.x, tfCompare$StDev.y) # 0.998
+cor(tfCompare$StDev.x, tfCompare$StDev.y) # 0.999
 par(mfrow=c(1,2))
 plot(tfCompare$tFactor, tfCompare$TFactor, main = "Time factors") # 
 abline(a = 0, b = 1)
