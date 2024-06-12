@@ -21,7 +21,7 @@ min.fun <- function(alpha,fij,Phi) {
   #F[abs(fij-1)<1e-10] = 1 # Yearsley
   F[abs(fij-1)<1.0E-10] = 0.99999 # to match Hill (2012), although not needed for Yearlsey calc strictly
   F[abs(fij-1)>0.99999] = 1.0E-10
-  return( sum(F^2)/sum(F) - Phi)
+  return(sum(F^2)/sum(F) - Phi)
 }
 
 speciesListFun = function(spList, species) {
@@ -41,7 +41,7 @@ speciesListFun = function(spList, species) {
   return(out)
 }
 
-frescalo = function(data_in, speciesList, spLocations, speciesNames, Phi=0.74, R_star=0.27, missing.data = 2) {
+frescalo = function(data_in, speciesList, spLocations, speciesNames, Phi=0.74, R_star=0.2703, missing.data = 2) {
   ## testing
   #data_in = dSplit[[1]]; Phi=0.74; R_star=0.27; missing.data = 1
   #missing.data = 2
@@ -106,7 +106,7 @@ frescalo = function(data_in, speciesList, spLocations, speciesNames, Phi=0.74, R
       while (min.fun(alpha.min, frequency, Phi)>0) { alpha.min = alpha.min/2}  
       
       # Find sampling-effort multiplier
-      sol=uniroot(min.fun,interval=c(alpha.min,alpha.max), tol=0.001, frequency, Phi)
+      sol=uniroot(min.fun,interval=c(alpha.min,alpha.max), tol=0.0003, frequency, Phi)
       out$alpha[f] = sol$root
       out$phi_in[f] = phi_in
       out$iter[f] = sol$iter
@@ -116,13 +116,15 @@ frescalo = function(data_in, speciesList, spLocations, speciesNames, Phi=0.74, R
       out$spnum_out[f] = sum(1-exp(sol$root*log(1-frequency)))
       
       # Create the data frame with the local species frequencies after correction
-      freq.order = order(frequency, decreasing=T)
+      freq.order = order(frequency, decreasing=T) # no explicit method to deal with ties, so any ties just arranged using original name order
       focal.ind = match(focal,spLocations,nomatch=length(spLocations))
       
       # Pick out benchmark species (assumes that species are ordered by rank)
       benchmarkSpecies = rep(0, times=length(frequency))
-      R_prime=c(1:length(speciesList[[focal.ind]]))/out$spnum_out[f]
-      benchmarkSpecies[R_prime<R_star] = 1
+      R_prime = c(1:length(speciesList[[focal.ind]]))/out$spnum_out[f] # rescaled rank
+      # Benchmark species are either those where rescaled rank < R_star, or are ranked number 1 even tho all R_prime > R_star
+      benchmarkSpecies[R_prime<R_star | c(1:length(speciesList[[focal.ind]]))==1 ] = 1
+      #benchmarkSpecies[R_prime<R_star] = 1 ## Yearsley original only had one condition. Adding second increases correlation with Hill fortran marginally
       
       # freq_1 is the corrected neighbourhood frequencies
       freq.out = rbind(freq.out, data.frame(location=focal, 
@@ -177,7 +179,7 @@ trend = function(s_data, freq.out) {
   focal_bench = split(freq.out, factor(freq.out$location, levels=locationList))
   s_it = mapply(FUN=function(x,y) {sum(x$benchmark[x$species %in% y$species])/sum(x$benchmark)}, 
                 x=focal_bench, y=focal_s, SIMPLIFY=T, USE.NAMES=F)
-  s_it[is.na(s_it)] <- 0 # added by OL Pescott Apr 2024, as apparently sometimes x$benchmark can be zero (and so s_it is NaN)
+  s_it[is.na(s_it)] <- 1.0E-7 # added by OL Pescott Apr 2024, as apparently sometimes x$benchmark can be zero (and so s_it is NaN)
   # Calculate weights to downweight infrequenctly sampled locations 
   # i.e. seeing fewer than 9.95% of the benchmark species (s_it<0.0995)
   w = rep(1, each=length(locationList))
