@@ -124,7 +124,74 @@ stopCluster(cl)
 gc()
 
 ## Check against fortran outputs
+library(reshape2)
 load(file = "data/unicorn_TF.rda")
+
+## Site-based stuff ##
+# Alpha
+#par(mfrow=c(1,1))
+head(unicorn_TF$stat)
+alphaDF <- data.frame(alpha = output$frescalo.out$alpha, Location = output$frescalo.out$location)
+alphaCompare <- merge(unicorn_TF$stat, alphaDF, by = c("Location"))
+head(alphaCompare)
+cor(alphaCompare$alpha, alphaCompare$Alpha) #0.9998
+plot(alphaCompare$alpha, alphaCompare$Alpha, main = "Alpha") #
+#plot(alphaCompare$alpha, alphaCompare$Alpha, main = "Alpha", xlim = c(15,30), ylim = c(15,30)) # 0.993
+abline(a = 0, b = 1)
+
+# Estimated species richness
+#par(mfrow=c(1,1))
+head(unicorn_TF$stat)
+spnumDF <- data.frame(spnum = output$frescalo.out$spnum_out, Location = output$frescalo.out$location)
+spnumCompare <- merge(unicorn_TF$stat, spnumDF, by = c("Location"))
+head(spnumCompare)
+cor(spnumCompare$spnum, spnumCompare$Spnum_out) # 0.9999
+plot(spnumCompare$spnum, spnumCompare$Spnum_out, main = "Predicted \n site richness")
+abline(a = 0, b = 1)
+
+## Species x site based stuff ##
+# Local frequency
+#par(mfrow=c(1,1))
+head(unicorn_TF$freq)
+fo <- output$freq.out[,c(1,2,4)]
+names(fo) <- c("Location", "Species", "freq")
+lwfCompare <- merge(unicorn_TF$freq, fo, by = c("Species", "Location"))
+head(lwfCompare)
+cor(lwfCompare$freq, lwfCompare$Freq) # 0.9997
+plot(lwfCompare$freq, lwfCompare$Freq, main = "Raw species' weighted \n freqs")
+abline(a = 0, b = 1)
+
+# Ranks
+#par(mfrow=c(1,1))
+ro <- output$freq.out[,c(1,2,7)]
+names(ro) <- c("Location", "Species", "rank1")
+lwfRank1Compare <- merge(unicorn_TF$freq, ro, by = c("Species", "Location"))
+head(lwfRank1Compare)
+cor(lwfRank1Compare$rank1, lwfRank1Compare$Rank1) # 0.9987
+plot(lwfRank1Compare$rank1, lwfRank1Compare$Rank1, main = "Species ranks") # inflated ranks presumablt reflected in rescaled rank below
+abline(a = 0, b = 1)
+# Discrepancies
+lwfRank1Compare$diff <- abs(round(lwfRank1Compare$Rank1, digits = 1) - round(lwfRank1Compare$rank1, digits = 1))
+lwfRank1Compare[order(lwfRank1Compare$diff, decreasing = T),]
+sum(lwfRank1Compare$diff==0)/nrow(lwfRank1Compare)*100 # 93.7% agreement to 1 decimal place
+# Seem to be some cases of switching, e.g. Species 47 and 57 in NH53?
+chk1 <- lwfRank1Compare[lwfRank1Compare$Location=="NH53",]
+chk1 <- chk1[order(chk1$Rank),] ## looks like it is to do with tied frequencies
+# Check another with a relatively large discrepancy in rank1 (0.7)
+chk <- lwfRank1Compare[lwfRank1Compare$Location=="NT51",]
+chk <- chk[order(chk$Rank),] # disagreements are mainly around where species are absent and therefore presumably assigned ranks based on ordering of names only (no effect on benchmarks)
+
+# Rescaled freq
+#par(mfrow=c(1,1))
+rf <- output$freq.out[,c(1,2,5)]
+names(rf) <- c("Location", "Species", "freq_1")
+jDat2DFCompare <- merge(unicorn_TF$freq, rf, by = c("Species", "Location"))
+head(jDat2DFCompare)
+cor(jDat2DFCompare$freq_1, jDat2DFCompare$Freq1) # 0.9994
+plot(jDat2DFCompare$freq_1, jDat2DFCompare$Freq1, main = "Rescaled species' \n weighted frequencies (f_ij)")
+abline(a = 0, b = 1)
+
+## Time factor and SD
 fortranTrend <- unicorn_TF$trend
 names(fortranTrend)[1:2] <- c("species","time")
 para.trend <- trend.out$trend.out
